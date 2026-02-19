@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flipbook Layanan Nasabah</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #1e293b; /* Slate 800 */
+            background-image: radial-gradient(#334155 1px, transparent 1px);
+            background-size: 20px 20px;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* 3D Scene Setup */
+        .scene {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            perspective: 1500px;
+            overflow: hidden;
+        }
+
+        .book {
+            position: relative;
+            width: 800px; /* Base width */
+            height: 450px; /* Base height (aspect ratio approx 16:9 like the images) */
+            transform-style: preserve-3d;
+            transition: transform 0.5s;
+        }
+
+        /* Pages */
+        .page {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            transform-origin: left center;
+            transform-style: preserve-3d;
+            transition: transform 1s cubic-bezier(0.645, 0.045, 0.355, 1);
+            cursor: pointer;
+            border-radius: 0 5px 5px 0;
+            background-color: white;
+            box-shadow: 
+                inset 5px 0 10px rgba(0,0,0,0.1), /* Spine shadow */
+                2px 0 5px rgba(0,0,0,0.2); /* Drop shadow */
+        }
+
+        .page-content {
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: white;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            border-radius: 0 5px 5px 0;
+        }
+
+        .page-content img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* Ensure image fits completely */
+            background-color: #f8fafc;
+        }
+
+        /* The back of the page (when flipped) */
+        .page-back {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #f1f5f9;
+            transform: rotateY(180deg);
+            backface-visibility: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 5px 0 0 5px;
+            box-shadow: inset -5px 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .page-back::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23cbd5e1' fill-opacity='0.4' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3Ccircle cx='13' cy='13' r='3'/%3E%3C/g%3E%3C/svg%3E");
+        }
+        
+        .page-back span {
+            z-index: 10;
+            color: #94a3b8;
+            font-weight: bold;
+            font-size: 1.2rem;
+            transform: scaleX(-1); /* Mirror text fix if needed, but rotateY handles it */
+        }
+
+        /* Flipped State */
+        .page.flipped {
+            transform: rotateY(-180deg);
+        }
+
+        /* Controls */
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            z-index: 100;
+        }
+
+        .btn {
+            background: white;
+            color: #1e293b;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0,0,0,0.2);
+            background-color: #f8fafc;
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Info Overlay */
+        .info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border-radius: 8px;
+            backdrop-filter: blur(4px);
+        }
+
+        /* Responsive Scaling logic is handled in JS, but media queries help UI */
+        @media (max-width: 768px) {
+            .controls {
+                bottom: 80px; /* Move up for mobile touch areas */
+                width: 90%;
+                justify-content: center;
+            }
+            .info {
+                font-size: 0.8rem;
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="info">
+        <h1 class="font-bold text-lg">Flipbook Manajemen Risiko</h1>
+        <p class="text-sm opacity-80">Divisi Manajemen Risiko & Layanan Nasabah</p>
+    </div>
+
+    <div class="scene" id="scene">
+        <div class="book" id="book">
+            <!-- Pages will be injected here by JavaScript -->
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn" id="prevBtn" onclick="goPrev()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            Sebelumnya
+        </button>
+        <span id="pageIndicator" class="px-4 py-2 bg-slate-700 text-white rounded-full flex items-center font-mono">1 / 10</span>
+        <button class="btn" id="nextBtn" onclick="goNext()">
+            Selanjutnya
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+    </div>
+
+    <script>
+        // Configuration
+        // Note: Using the filenames uploaded by the user.
+        // The order is assumed based on the logic LN_1 to LN_10.
+        const imageFiles = [
+            "LN_1.png",
+            "LN_2.png",
+            "LN_3.png",
+            "LN_4.png",
+            "LN_5.png",
+            "LN_6.png",
+            "LN_7.png",
+            "LN_8.png",
+            "LN_9.png",
+            "LN_10.png"
+        ];
+
+        const book = document.getElementById('book');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const pageIndicator = document.getElementById('pageIndicator');
+        let pages = [];
+        let currentPageIndex = 0; // 0 means first page is visible on top
+
+        // Initialize Book
+        function initBook() {
+            // Create pages in reverse order so the first one is last in DOM (top of stack visually)
+            // Actually, for z-index manipulation, simple loop is fine.
+            
+            imageFiles.forEach((imgSrc, index) => {
+                const page = document.createElement('div');
+                page.className = 'page';
+                // Assign initial z-index. First page (index 0) gets highest z-index.
+                page.style.zIndex = imageFiles.length - index;
+                
+                // Front Content (The Image)
+                const content = document.createElement('div');
+                content.className = 'page-content';
+                const img = document.createElement('img');
+                img.src = imgSrc;
+                img.alt = `Halaman ${index + 1}`;
+                img.draggable = false; // Prevent ghost drag
+                content.appendChild(img);
+
+                // Back Content (Generic pattern)
+                const back = document.createElement('div');
+                back.className = 'page-back';
+                const backText = document.createElement('span');
+                backText.innerText = ""; // Optional: "Balik Halaman " + (index + 1)
+                back.appendChild(backText);
+
+                page.appendChild(content);
+                page.appendChild(back);
+                
+                // Add Click Event to Flip
+                page.onclick = () => {
+                    if (index === currentPageIndex) {
+                        goNext();
+                    } else if (index === currentPageIndex - 1) {
+                        goPrev();
+                    }
+                };
+
+                book.appendChild(page);
+                pages.push(page);
+            });
+
+            updateControls();
+            adjustSize();
+        }
+
+        // Z-Index Management Logic
+        // The Z-Index determines stacking order. 
+        // Unflipped pages: Stacked Descending (Page 0 is top).
+        // Flipped pages: Stacked Ascending (Page 0 is bottom of left stack).
+        function updateZIndexes() {
+            pages.forEach((page, index) => {
+                if (index < currentPageIndex) {
+                    // Page is flipped (on the left)
+                    // The most recently flipped page (closest to current) should be on top of left stack
+                    page.style.zIndex = index + 1;
+                } else {
+                    // Page is unflipped (on the right)
+                    // The immediate next page should be on top of right stack
+                    page.style.zIndex = imageFiles.length - index;
+                }
+            });
+        }
+
+        function goNext() {
+            if (currentPageIndex < imageFiles.length) {
+                const pageToFlip = pages[currentPageIndex];
+                pageToFlip.classList.add('flipped');
+                currentPageIndex++;
+                updateZIndexes();
+                updateControls();
+            }
+        }
+
+        function goPrev() {
+            if (currentPageIndex > 0) {
+                currentPageIndex--;
+                const pageToUnflip = pages[currentPageIndex];
+                pageToUnflip.classList.remove('flipped');
+                updateZIndexes(); // Update z-index *after* state change logic, but creates visual glitch if CSS transition hasn't started? 
+                // Actually, for un-flipping, we want the returning page to be high z-index immediately so it flies over others.
+                
+                // Special handling for smoother Z-index during unflip animation:
+                // When moving from Left to Right, the page needs to be on top of the Right stack.
+                // Our standard function handles this: Unflipped Page X gets Z = Max - X.
+                // Since X is the current page being restored, it will have the highest Z of the right stack.
+            }
+            updateControls();
+        }
+
+        function updateControls() {
+            prevBtn.disabled = currentPageIndex === 0;
+            nextBtn.disabled = currentPageIndex === imageFiles.length;
+            
+            // Text Indicator
+            let displayNum = currentPageIndex + 1;
+            if (displayNum > imageFiles.length) displayNum = imageFiles.length; // Cap at max
+            
+            // Logic change: If all flipped, we are at the end
+            let currentVisualPage = currentPageIndex + 1;
+            if (currentPageIndex === imageFiles.length) {
+                pageIndicator.innerText = "Selesai";
+            } else {
+                pageIndicator.innerText = `${currentVisualPage} / ${imageFiles.length}`;
+            }
+        }
+
+        // Responsive Scaling
+        // Calculates scale factor to fit the book within the window
+        function adjustSize() {
+            const margin = 40; // px
+            const bookBaseWidth = 800;
+            const bookBaseHeight = 450;
+            
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            // Available space
+            const availWidth = windowWidth - margin;
+            const availHeight = windowHeight - 150; // Leave room for controls
+            
+            const scaleX = availWidth / bookBaseWidth;
+            const scaleY = availHeight / bookBaseHeight;
+            
+            // Use the smaller scale to fit entirely
+            let scale = Math.min(scaleX, scaleY);
+            
+            // Cap scale at 1.2 for large screens so it doesn't get ridiculous
+            if (scale > 1.5) scale = 1.5;
+            
+            book.style.transform = `scale(${scale})`;
+        }
+
+        // Initialization
+        window.addEventListener('resize', adjustSize);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === "ArrowRight") goNext();
+            if (e.key === "ArrowLeft") goPrev();
+        });
+
+        initBook();
+
+    </script>
+</body>
+</html>
